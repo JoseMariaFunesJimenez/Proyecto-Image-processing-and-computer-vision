@@ -15,6 +15,8 @@ import torch.nn as nn
 import torch.optim
 
 
+print("🧩 model.py cargado correctamente")
+
 # --------------------------------------------------------------------------------
 # CREATE A FOLDER IF IT DOES NOT EXIST
 # INPUT: 
@@ -63,8 +65,9 @@ class Network_Class:
         # -------------------
         # TRAINING PARAMETERS
         # -------------------
-        self.criterion = ...
-        self.optimizer = ... 
+        # Lo que he rellenado
+        self.criterion = nn.CrossEntropyLoss()
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
         # ----------------------------------------------------
         # DATASET INITIALISATION (from the dataLoader.py file)
@@ -88,17 +91,80 @@ class Network_Class:
     # -----------------------------------
     def train(self): 
         # train for a given number of epochs
-        for i in range(self.epoch):
-            print("Loss at i-th epoch: ", str(np.random.random_sample()))
-            modelWts = copy.deepcopy(self.model.state_dict())
+        #for i in range(self.epoch):
+        #    print("Loss at i-th epoch: ", str(np.random.random_sample()))
+        #    modelWts = copy.deepcopy(self.model.state_dict())
 
         # Print learning curves
         # Implement this...
 
         # Save the model weights
-        wghtsPath  = self.resultsPath + '/_Weights/'
+        #wghtsPath  = self.resultsPath + '/_Weights/'
+        #createFolder(wghtsPath)
+        #torch.save(modelWts, wghtsPath + '/wghts.pkl')
+
+        # Este metodo añadido entero
+
+        print("✅ Entrando al método train() ...")
+        train_losses = []
+        val_losses = []
+
+        for epoch in range(self.epoch):
+            # ---- TRAIN MODE ----
+            self.model.train()
+            total_train_loss = 0
+
+            for images, masks, _, _ in self.trainDataLoader:
+                images, masks = images.to(self.device), masks.to(self.device)
+
+                # Forward
+                outputs = self.model(images)
+                loss = self.criterion(outputs, masks.long())
+
+                # Backward
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+                total_train_loss += loss.item()
+
+            avg_train_loss = total_train_loss / len(self.trainDataLoader)
+            train_losses.append(avg_train_loss)
+
+            # ---- VALIDATION MODE ----
+            self.model.eval()
+            total_val_loss = 0
+            with torch.no_grad():
+                for images, masks, _, _ in self.valDataLoader:
+                    images, masks = images.to(self.device), masks.to(self.device)
+                    outputs = self.model(images)
+                    loss = self.criterion(outputs, masks.long())
+                    total_val_loss += loss.item()
+
+            avg_val_loss = total_val_loss / len(self.valDataLoader)
+            val_losses.append(avg_val_loss)
+
+            print(f"Epoch [{epoch+1}/{self.epoch}] | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+
+            # Guardar pesos si quieres conservar el mejor modelo
+            modelWts = copy.deepcopy(self.model.state_dict())
+
+        # Guardar curvas de pérdida
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.plot(train_losses, label="Train Loss")
+        plt.plot(val_losses, label="Validation Loss")
+        plt.legend()
+        plt.title("Loss Curves")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.savefig(os.path.join(self.resultsPath, "loss_curves.png"))
+        plt.close()
+
+        # Guardar pesos finales
+        wghtsPath = os.path.join(self.resultsPath, "_Weights")
         createFolder(wghtsPath)
-        torch.save(modelWts, wghtsPath + '/wghts.pkl')
+        torch.save(modelWts, os.path.join(wghtsPath, "wghts.pkl"))
 
 
 
@@ -134,4 +200,9 @@ class Network_Class:
     
         # Quantitative Evaluation
         # Implement this ! 
+        #Esto tb lo he añadido
+        intersection = np.logical_and(allMasksPreds == allMasks, allMasks > 0)
+        union = np.logical_or(allMasksPreds == allMasks, allMasks > 0)
+        iou = np.sum(intersection) / np.sum(union)
+        print(f"Mean IoU over test set: {iou:.3f}")
 
