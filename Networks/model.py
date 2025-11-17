@@ -1,6 +1,7 @@
 from Dataset.dataLoader import *
 from Dataset.makeGraph import *
-from Networks.Architectures.basicNetwork import *
+#from Networks.Architectures.basicNetwork import *
+from Networks.Architectures.partANetwork import *
 
 import numpy as np
 np.random.seed(2885)
@@ -15,7 +16,7 @@ import torch.nn as nn
 import torch.optim
 
 
-print("🧩 model.py cargado correctamente")
+print(" model.py cargado correctamente")
 
 # --------------------------------------------------------------------------------
 # CREATE A FOLDER IF IT DOES NOT EXIST
@@ -46,6 +47,7 @@ class Network_Class:
     #                          experiement
     # --------------------------------------------------------------------------------
     def __init__(self, param, imgDirectory, maskDirectory, resultsPath):
+
         # ----------------
         # USEFUL VARIABLES 
         # ----------------
@@ -60,8 +62,12 @@ class Network_Class:
         # -----------------------------------
         # NETWORK ARCHITECTURE INITIALISATION
         # -----------------------------------
-        self.model = Net(param).to(self.device)
+        #self.model = Net(param).to(self.device)
 
+        #imagenes RGB y 5 clases de terreno
+        self.model = MyUNet(in_channels=3, out_channels=5).to(self.device)
+
+        print(f" Modelo inicializado: {self.model.__class__.__name__}")
         # -------------------
         # TRAINING PARAMETERS
         # -------------------
@@ -105,7 +111,7 @@ class Network_Class:
 
         # Este metodo añadido entero
 
-        print("✅ Entrando al método train() ...")
+        print(" Entrando al método train() ...")
         train_losses = []
         val_losses = []
 
@@ -200,9 +206,42 @@ class Network_Class:
     
         # Quantitative Evaluation
         # Implement this ! 
-        #Esto tb lo he añadido
-        intersection = np.logical_and(allMasksPreds == allMasks, allMasks > 0)
-        union = np.logical_or(allMasksPreds == allMasks, allMasks > 0)
-        iou = np.sum(intersection) / np.sum(union)
-        print(f"Mean IoU over test set: {iou:.3f}")
+        # Esto tb lo he añadido
+        # Esto calcula el IoU total sin distinguir entre clases
+        # Calcula una única interseccion y union global sobre toda la imagen, sin 
+        # distinguir entre clases. En la práctica, mezcla todos los pixeles de todas
+        # categorías en una sola cuenta.
+
+
+        #intersection = np.logical_and(allMasksPreds == allMasks, allMasks > 0)
+        #union = np.logical_or(allMasksPreds == allMasks, allMasks > 0)
+        #iou = np.sum(intersection) / np.sum(union)
+        #print(f"Mean IoU over test set: {iou:.3f}")
+
+        # Quantitative Evaluation
+        # Calcula el IoU individualmente para cada clase (0,1,2,3,4) y luego hace 
+        # el promedio (mean) de todos los IoUs.
+
+       
+        num_classes = 5
+        ious = []
+        for c in range(num_classes):
+            intersection = np.logical_and(allMasksPreds == c, allMasks == c).sum()
+            union = np.logical_or(allMasksPreds == c, allMasks == c).sum()
+            if union == 0:
+                ious.append(float('nan'))  # si no hay píxeles de esa clase
+            else:
+                ious.append(intersection / union)
+
+        mean_iou = np.nanmean(ious)
+
+        # Mostrar IoU por clase
+        classes = ["Others", "Water", "Buildings", "Farmlands", "GreenSpaces"]
+        print("\n IoU per class:")
+        for name, iou in zip(classes, ious):
+            print(f"  {name:<12}: {iou:.3f}")
+
+        print(f"\n Mean IoU over test set: {mean_iou:.3f}")
+       
+
 
